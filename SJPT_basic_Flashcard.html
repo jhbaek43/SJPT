@@ -20,7 +20,12 @@
     .rotate-y-180 {
       transform: rotateY(180deg);
     }
-  </style>
+  #cardContainer.has-example { aspect-ratio:auto; height:440px; }
+    #backExample { margin-top:12px; padding-top:16px; border-top:1px solid #475569; }
+    #backExample[hidden] { display:none; }
+    #backExampleJapanese { font-size:19px; line-height:1.8; color:#e0e7ff; }
+    #backExampleKorean { margin-top:10px; font-size:15px; line-height:1.7; color:#cbd5e1; }
+    </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
   <!-- 상단 네비게이션 헤더 -->
@@ -132,7 +137,7 @@
                 <span id="backWordMini" class="font-semibold text-white">駅員</span>
                 <span id="backReadingMini" class="text-indigo-300 font-normal">[えきいん]</span>
               </div>
-              <h3 id="backMeaning" class="text-2xl sm:text-3xl font-extrabold text-emerald-400">역무원</h3>
+              <h3 id="backMeaning" class="text-2xl sm:text-3xl font-extrabold text-emerald-400">역무원</h3><div id="backExample" hidden><p id="backExampleJapanese" lang="ja"></p><p id="backExampleKorean"></p></div>
             </div>
 
             <div class="w-full text-center">
@@ -702,6 +707,9 @@
 
     // 현재 카드 렌더링
     function renderCurrentCard() {
+      const example = document.getElementById('backExample');
+      example.hidden = true;
+      document.getElementById('cardContainer').classList.remove('has-example');
       if (displayedList.length === 0) {
         frontWord.textContent = "검색 결과 없음";
         frontReading.textContent = "-";
@@ -725,6 +733,12 @@
       backWordMini.textContent = item.word;
       backReadingMini.textContent = `[${item.reading}]`;
       backMeaning.textContent = item.meaning;
+      if (item.id === 189) {
+        document.getElementById('backExampleJapanese').textContent = '入庫する時期がいつ頃か確認していただけませんか？';
+        document.getElementById('backExampleKorean').textContent = '(언제쯤 입고되는지 확인해 주실 수 있겠습니까?)';
+        example.hidden = false;
+        document.getElementById('cardContainer').classList.add('has-example');
+      }
       backProbTag.textContent = `문제: ${item.prob}`;
 
       currentNumBadge.textContent = `Card ${currentIndex + 1} / ${displayedList.length}`;
