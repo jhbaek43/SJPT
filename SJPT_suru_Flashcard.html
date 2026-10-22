@@ -36,7 +36,7 @@ td div[lang="ja"] { line-height:2.4; }
 #cardContainer.has-example { height:550px; }
 @media(max-width:480px){ #cardContainer.has-example { height:640px; } }
 </style>
-</head>
+<style>#autoPlayBtn,#starToggleBtn{width:44px;height:44px;padding:0;display:inline-grid;place-items:center;border-radius:9px}#autoPlayBtn{background:#ea580c;border:1px solid #fb923c;color:#fff}#autoPlayBtn:hover{background:#c2410c;border-color:#fdba74}#autoPlayBtn.ring-2{background:#f97316;border-color:#fed7aa}</style></head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
   <!-- 상단 네비게이션 헤더 -->
   <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 sticky top-0 z-30 px-4 py-3 shadow-md">
@@ -104,7 +104,8 @@ td div[lang="ja"] { line-height:2.4; }
           <span class="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[11px] text-indigo-400" id="currentProbBadge">학습 구간: 01</span>
         </div>
         <div class="flex items-center gap-3">
-          <button id="starToggleBtn" class="text-slate-400 hover:text-amber-400 transition text-base">
+          <button id="autoPlayBtn" class="w-11 h-11 inline-grid place-items-center rounded-lg bg-orange-600 hover:bg-orange-700 border border-orange-400 text-white transition text-base" aria-label="자동 넘김 시작" title="자동 넘김 시작" aria-pressed="false">▶</button>
+          <button id="starToggleBtn" class="w-11 h-11 inline-grid place-items-center rounded-lg text-slate-400 hover:text-amber-400 transition text-base">
             <i class="fa-regular fa-star"></i>
           </button>
           <button id="ttsBtn" class="text-slate-400 hover:text-indigo-400 transition text-base" title="일본어 발음 듣기">
@@ -217,6 +218,9 @@ td div[lang="ja"] { line-height:2.4; }
     let isFlipped = false;
     let starredIds = new Set(JSON.parse(localStorage.getItem('sjpt_suru309_starred_v1') || '[]'));
     let onlyStarred = false;
+    const AUTO_DELAY = 5000;
+    let autoPlaying = false;
+    let autoTimer = null;
 
     // DOM 요소
     const cardContainer = document.getElementById('cardContainer');
@@ -235,6 +239,7 @@ td div[lang="ja"] { line-height:2.4; }
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const flipBtn = document.getElementById('flipBtn');
+    const autoPlayBtn = document.getElementById('autoPlayBtn');
     const starToggleBtn = document.getElementById('starToggleBtn');
     const starredCount = document.getElementById('starredCount');
     const ttsBtn = document.getElementById('ttsBtn');
@@ -284,8 +289,15 @@ td div[lang="ja"] { line-height:2.4; }
       window.speechSynthesis.speak(utterance);
     }
 
+    function clearAutoTimer() { if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; } }
+    function updateAutoStatus() { autoPlayBtn.classList.toggle('ring-2', autoPlaying); autoPlayBtn.classList.toggle('ring-orange-200', autoPlaying); autoPlayBtn.textContent = autoPlaying ? '■' : '▶'; autoPlayBtn.setAttribute('aria-pressed', String(autoPlaying)); const label = autoPlaying ? '자동 넘김 정지' : '자동 넘김 시작'; autoPlayBtn.setAttribute('aria-label', label); autoPlayBtn.title = label; }
+    function stopAuto() { autoPlaying = false; clearAutoTimer(); updateAutoStatus(); }
+    function scheduleAuto() { clearAutoTimer(); if (!autoPlaying || !displayedList.length || flashcardView.classList.contains('hidden')) { stopAuto(); return; } autoTimer = setTimeout(() => { window.speechSynthesis?.cancel(); if (isFlipped) { currentIndex = (currentIndex + 1) % displayedList.length; renderCurrentCard(); playJapaneseAudio(displayedList[currentIndex].word.replace(/[()]/g, '')); } else { setFlipped(true); } scheduleAuto(); }, AUTO_DELAY); }
+    function toggleAuto() { if (autoPlaying) { stopAuto(); window.speechSynthesis?.cancel(); return; } if (!displayedList.length) return; listView.classList.add('hidden'); flashcardView.classList.remove('hidden'); setFlipped(false); autoPlaying = true; updateAutoStatus(); playJapaneseAudio(displayedList[currentIndex].word.replace(/[()]/g, '')); scheduleAuto(); }
+
     // 필터링 적용 함수
     function applyFilters() {
+      stopAuto();
       const query = searchInput.value.trim().toLowerCase();
       const selectedProb = probFilter.value;
 
@@ -376,6 +388,7 @@ td div[lang="ja"] { line-height:2.4; }
     function toggleFlip() {
       if (displayedList.length === 0) return;
       setFlipped(!isFlipped);
+      if (autoPlaying) scheduleAuto();
     }
 
     // 목록 모드 렌더링
@@ -432,6 +445,8 @@ td div[lang="ja"] { line-height:2.4; }
 
     // 이벤트 리스너 설정
     function setupEventListeners() {
+      autoPlayBtn.addEventListener('click', toggleAuto);
+
       // 카드 뒤집기
       cardContainer.addEventListener('click', toggleFlip);
       flipBtn.addEventListener('click', (e) => {
@@ -443,13 +458,17 @@ td div[lang="ja"] { line-height:2.4; }
       prevBtn.addEventListener('click', () => {
         if (displayedList.length === 0) return;
         currentIndex = (currentIndex - 1 + displayedList.length) % displayedList.length;
+        if (autoPlaying) clearAutoTimer();
         renderCurrentCard();
+        if (autoPlaying) scheduleAuto();
       });
 
       nextBtn.addEventListener('click', () => {
         if (displayedList.length === 0) return;
         currentIndex = (currentIndex + 1) % displayedList.length;
+        if (autoPlaying) clearAutoTimer();
         renderCurrentCard();
+        if (autoPlaying) scheduleAuto();
       });
 
       // 음성 듣기
@@ -478,6 +497,7 @@ td div[lang="ja"] { line-height:2.4; }
 
       // 셔플 버튼
       shuffleBtn.addEventListener('click', () => {
+        stopAuto();
         if (displayedList.length <= 1) return;
         for (let i = displayedList.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -505,6 +525,7 @@ td div[lang="ja"] { line-height:2.4; }
 
       // 모드 변경 (카드 vs 리스트)
       modeFlashcardBtn.addEventListener('click', () => {
+        stopAuto();
         modeFlashcardBtn.className = "px-3 py-1.5 rounded-lg bg-indigo-600 font-semibold text-white transition";
         modeListBtn.className = "px-3 py-1.5 rounded-lg bg-slate-700 font-medium text-slate-300 transition hover:bg-slate-600";
         flashcardView.classList.remove('hidden');
@@ -512,6 +533,7 @@ td div[lang="ja"] { line-height:2.4; }
       });
 
       modeListBtn.addEventListener('click', () => {
+        stopAuto();
         modeListBtn.className = "px-3 py-1.5 rounded-lg bg-indigo-600 font-semibold text-white transition";
         modeFlashcardBtn.className = "px-3 py-1.5 rounded-lg bg-slate-700 font-medium text-slate-300 transition hover:bg-slate-600";
         listView.classList.remove('hidden');
